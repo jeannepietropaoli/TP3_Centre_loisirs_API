@@ -40,8 +40,8 @@ class ControlleurActivites {
 
     function ajouterActivite($data) {
         $res = new stdClass();
-        if(isset($data['nom']) && isset($data['type']) && isset($data['prix']) && isset($data['date']) && isset($data['heure'])) {    
-            $res->message = modele_activite::ajouter($data['nom'], $data['type'], $data['prix'], $data['date'], $data['heure']);
+        if(isset($data['nom']) && isset($data['type']) && isset($data['prix']) && isset($data['date']) && isset($data['heure']) && isset($data['description']) && isset($data['imgUrl'])) {    
+            $res->message = modele_activite::ajouter($data['nom'], $data['type'], $data['prix'], $data['date'], $data['heure'], $data['description'], $data['imgUrl']);
         } else {
             $res->message = "Impossible d'ajouter une activite. Des informations sont manquantes ou erronées.";
         }
@@ -52,8 +52,8 @@ class ControlleurActivites {
     function modifierActivite($data) {
         $res = new stdClass();
 
-        if(isset($data['nom']) && isset($data['type']) && isset($data['prix']) && isset($data['date']) && isset($data['heure'])) {   
-            $res->message = modele_activite::ajouter($data['nom'], $data['type'], $data['prix'], $data['date'], $data['heure']);
+        if(isset($_GET["id"]) && isset($data['nom']) && isset($data['type']) && isset($data['prix']) && isset($data['date']) && isset($data['heure']) && isset($data['description']) && isset($data['imgUrl'])) {   
+            $res->message = modele_activite::editer($_GET["id"], $data['nom'], $data['type'], $data['prix'], $data['date'], $data['heure'], $data['description'], $data['imgUrl']);
         } else {
             $res->message = "Impossible de modifier l'activite. Des informations sont manquantes ou erronées.";
         }

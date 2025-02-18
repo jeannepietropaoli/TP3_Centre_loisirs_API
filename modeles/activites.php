@@ -10,14 +10,18 @@ class modele_activite {
     public $prix;
     public $date;
     public $heure;
+    public $description;
+    public $imgUrl;
 
-    public function __construct($id, $nom, $type, $prix, $date, $heure) {
+    public function __construct($id, $nom, $type, $prix, $date, $heure, $description, $imgUrl) {
         $this->id = $id;
         $this->nom = $nom;
         $this->type = $type;
         $this->prix = $prix;
         $this->date = $date;
         $this->heure = $heure;
+        $this->description = $description;
+        $this->imgUrl = $imgUrl;
     }
 
     static function connecter() {
@@ -39,12 +43,11 @@ class modele_activite {
         $resultatRequete = $mysqli->query("SELECT activites.*, types_activites.type FROM activites INNER JOIN types_activites ON activites.type_activite_id = types_activites.id ORDER BY activites.date");
         if($resultatRequete) {
             foreach ($resultatRequete as $enregistrement) {
-                $res->activites[] = new modele_activite($enregistrement['id'], $enregistrement['nom'], $enregistrement['types_activites.type'], $enregistrement['prix'], $enregistrement['date'], $enregistrement['heure']);
+                $res->activites[] = new modele_activite($enregistrement['id'], $enregistrement['nom'], $enregistrement['type'], $enregistrement['prix'], $enregistrement['date'], $enregistrement['heure'], $enregistrement['description'], $enregistrement['imgUrl']);
             }
         } else {
             $res->erreur = "Erreur: Aucune activite trouvée.";
         }
-        $requete->close();
         return $res;
     }
 
@@ -52,13 +55,13 @@ class modele_activite {
         $res = new stdClass();
         $mysqli = self::connecter();
 
-        if ($requete = $mysqli->prepare("SELECT activites.*, types_activites.type FROM activites INNER JOIN types_activites ON activites.type_activite_id = types_activites.id ORDER BY activites.date")) {
+        if ($requete = $mysqli->prepare("SELECT activites.*, types_activites.type FROM activites INNER JOIN types_activites ON activites.type_activite_id = types_activites.id WHERE activites.id = ? ORDER BY activites.date")) {
             $requete->bind_param("i", $id); 
             $requete->execute();
             $resultatRequete = $requete->get_result();
             
             if($enregistrement = $resultatRequete->fetch_assoc()) {
-                $res->activite = new modele_activite($enregistrement['id'], $enregistrement['nom'], $enregistrement['types_activites.type'], $enregistrement['prix'], $enregistrement['date'], $enregistrement['heure']);
+                $res->activite = new modele_activite($enregistrement['id'], $enregistrement['nom'], $enregistrement['type'], $enregistrement['prix'], $enregistrement['date'], $enregistrement['heure'], $enregistrement['description'], $enregistrement['imgUrl']);
             } else {
                 $res->erreur = "Aucune activite trouvée.";
                 $res->activite = null;
@@ -80,15 +83,16 @@ class modele_activite {
         $utilisateurRes = modele_utilisateur::ObtenirUn($utilisateur_id);
         if(property_exists($utilisateurRes, 'errreur')) {
             $res = $utilisateurRes;
+            $res->activites = [];
         } else {
-            $requete = $mysqli->prepare("SELECT activites.*, types_activites.type FROM activites INNER JOIN types_activites ON activites.type_activite_id = types_activites.id INNER JOIN paniers ON activites.id = paniers.utilisateur_id WHERE utilisateur_id = ? ORDER BY activites.date");
+            $requete = $mysqli->prepare("SELECT activites.*, types_activites.type FROM activites INNER JOIN types_activites ON activites.type_activite_id = types_activites.id INNER JOIN paniers ON activites.id = paniers.activite_id WHERE paniers.utilisateur_id = ? ORDER BY activites.date");
             $requete->bind_param("i", $utilisateur_id);
     
             if($requete->execute()) {
                 $resultatRequete = $requete->get_result();
                 if($resultatRequete) {
                     foreach ($resultatRequete as $enregistrement) {
-                        $res->activites[] = new modele_activite($enregistrement['id'], $enregistrement['nom'], $enregistrement['types_activites.type'], $enregistrement['prix'], $enregistrement['date'], $enregistrement['heure']);
+                        $res->activites[] = new modele_activite($enregistrement['id'], $enregistrement['nom'], $enregistrement['type'], $enregistrement['prix'], $enregistrement['date'], $enregistrement['heure'], $enregistrement['description'], $enregistrement['imgUrl']);
                     }
                 } else {
                     $res->erreur = "Aucune activite trouvée.";
@@ -101,12 +105,12 @@ class modele_activite {
         return $res;
     }
 
-    public static function ajouter($nom, $type, $prix, $date, $heure) {
+    public static function ajouter($nom, $type, $prix, $date, $heure, $description, $imgUrl) {
         $message = '';
         $mysqli = self::connecter();
   
-        if ($requete = $mysqli->prepare("INSERT INTO activites(nom, type_activite_id, prix, date, heure) VALUES(?,?,?,?,?)")) {      
-            $requete->bind_param("sidss", $nom, $type, $prix, $date, $heure);
+        if ($requete = $mysqli->prepare("INSERT INTO activites(nom, type_activite_id, prix, date, heure, description, imgUrl) VALUES(?,?,?,?,?, ?, ?)")) {      
+            $requete->bind_param("sidssss", $nom, $type, $prix, $date, $heure, $description, $imgUrl);
 
             if($requete->execute()) {
                 $message = "Activite ajoutée";
@@ -121,20 +125,24 @@ class modele_activite {
         return $message;
     }
 
-    public static function editer($nom, $type, $prix, $date, $heure) {
+    public static function editer($id, $nom, $type, $prix, $date, $heure, $description, $imgUrl) {
         $message = '';
         $mysqli = self::connecter();
         
-        if ($requete = $mysqli->prepare("UPDATE activites SET nom=?, type_activite_id=?, prix=?, date=?, heure=? WHERE id=?")) {      
-            $requete->bind_param("sidss", $nom, $type, $prix, $date, $heure);
-
-            if($requete->execute()) {
-                $requete->affected_rows === 0 ? $message = "Aucune activite correspondant à cet id" : $message = "Activite modifiée";
+        $activiteAModifier = self::ObtenirUne($id);
+        
+        if ($activiteAModifier->activite === null) {
+            $message = $activiteAModifier->erreur;
+        } else if ($requete = $mysqli->prepare("UPDATE activites SET nom=?, type_activite_id=?, prix=?, date=?, heure=?, description=?, imgUrl=? WHERE id=?")) {      
+            $requete->bind_param("sidssssi", $nom, $type, $prix, $date, $heure, $description, $imgUrl, $id);
+    
+            if ($requete->execute()) {
+                $requete->affected_rows === 0 ? $message = "Aucune modification détectée" : $message = "Activite modifiée";
             } else {
-                $message =  "Une erreur est survenue lors de l'édition.";
+                $message = "Une erreur est survenue lors de l'édition.";
             }
             $requete->close();
-        } else  {
+        } else {
             $message = "Une erreur a été détectée dans la requête utilisée.";
         }
         return $message;
